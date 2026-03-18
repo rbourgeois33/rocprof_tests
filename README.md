@@ -64,13 +64,13 @@ Build and run the tutorial
 mkdir build ; cd build
 cmake ..
 make -j
-./hello_word
+./vcopy -n 1048576 -b 256 
 ```
 
 and put il all together 
 
 ```
-rocprof-compute profile -n hello_data -- ./hello_world 
+rocprof-compute profile --name vcopy -- ./vcopy -n 1048576 -b 256
 ```
 
 #
