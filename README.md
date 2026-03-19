@@ -85,6 +85,7 @@ Releasing CPU memory
 Load python
 
 ```bash
+module load python
 python3 --version
 # should be Python 3.12.1
 ```
@@ -92,7 +93,7 @@ python3 --version
 Launching `rocprof-compute` without setup will fail due to missing python packages. Install them in a local virtual environment under `$WORK` to avoid exhausting your inode quota:
 
 ```bash
-#In the root directory of rocprof_tests/
+#In e.g. the root directory of rocprof_tests/
 python3 -m venv ./venv_rocprof_compute
 source ./venv_rocprof_compute/bin/activate
 pip3 install -r requirements.txt
