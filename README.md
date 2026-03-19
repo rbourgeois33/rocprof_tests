@@ -4,12 +4,12 @@
 
 As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` is under active development, and releases earlier than `rocm/7.2.0` should not be used.
 
-To follow this tutorial, you will need to set up your environment:
+This tutorial will help you to set up your environment:
 
 - Create a module for `rocm/7.2.0`, which is available on Adastra but not exposed as a module, and load it.
 - Set up a Python virtual environment with `rocprof-compute`'s dependencies.
 
-It all seems very brittle at the moment, but we can expect a consolidation of the tools in the future.
+So that you can run the latest `rocprof-compute`.It all seems very brittle at the moment, but we can expect a consolidation of the tools in the future.
 
 [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html)
 
