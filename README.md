@@ -1,79 +1,129 @@
-# Rocprof compute 101 on adastra
+# Rocprof Compute 101 on Adastra, March 2023
 
-https://rocm.docs.amd.com/projects/rocprofiler-compute/en/docs-6.4.3/how-to/use.html
+## Context
 
-## Setup tutorial env
+As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` is under active development, and releases earlier than `rocm/7.2.0` should not be used.
 
-### Log into accelerated node
+To follow this tutorial, you will need to set up your environment:
 
-This tutorial is meant to be followed on a adasra MI250X via an interactive session. Ask for a node, and log into it.
+- Create a module for `rocm/7.2.0`, which is available on Adastra but not exposed as a module, and load it.
+- Set up a Python virtual environment with `rocprof-compute`'s dependencies.
+
+It all seems very brittle at the moment, but we can expect a consolidation of the tools in the future.
+
+[Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html)
+
+**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`. This tutorial is to get you prepared for the next generation of AMD profilers.
+
+
+## Setting up the Environment
+
+### Log into an accelerated node and fetch tutorial sources
+
+This tutorial requires an interactive session on an Adastra MI250X node:
+
 ```bash
-salloc --account=genden15 --constraint=MI250 --job-name="rocprof_tutorial" --gpus-per-node=1 --nodes=1 --time=1:00:00
+salloc --account=<your-account> --constraint=MI250 --job-name="rocprof_tutorial" --gpus-per-node=1 --nodes=1 --time=1:00:00
 ```
 
-`squeue --me` should show you the allocated node. Log into it via ssh e.g. `ssh g1015`
-
-only one gpu so
+Check your allocated node with `squeue --me`, then log into it (e.g. `ssh g1015`). Purge your modules, go to `$WORK`, and restrict visible devices to GPU 0:
 
 ```bash
+module purge
+cd $WORK
 export HIP_VISIBLE_DEVICES="0"
 ```
 
-### Load modules
-We don't want to make it complicated and stick with stable rocm on adastra provided by cray
+Clone the tutorial repository and check out the correct branch:
 
 ```bash
-module load cpe/25.09 PrgEnv-cray craype-accel-amd-gfx90a rocm cray-python
+git clone git@github.com:rbourgeois33/rocprof_tests.git
+cd rocprof_tests
+git checkout adastra-03-26
 ```
 
-`module list` should show
+### Create and load the rocm/7.2.0 module
+
+`rocm/7.2.0` is not listed by `module avail rocm`, but it is present on the system (`ls /opt/rocm-7.2.0/`). A `.lua` module file is provided under `rocm/` in this project. Add and load it:
 
 ```bash
-module list
-
-Currently Loaded Modules:
-  1) craype-x86-trento    3) cce/20.0.0               5) libfabric/2.2.0rc1   7) craype/2.7.35      9) cray-mpich/9.0.1     11) PrgEnv-cray/8.6.0        13) rocm/6.4.3
-  2) craype-network-ofi   4) perftools-base/25.09.0   6) cpe/25.09            8) cray-dsmml/0.3.1  10) cray-libsci/25.09.0  12) craype-accel-amd-gfx90a  14) cray-python/3.11.7
+#In the root directory of rocprof_tests/
+module use rocm/
+module avail rocm
+# rocm-7.2.0 should now be visible
+module load rocm-7.2.0
 ```
 
-### Get rocprof-compute working
-If you try to launch `rocprof-compute` you will get an error for missing python packages. So, install them in a local venv (in `/WORK`) to not explode your Inodes. In `$WORK`:
+Compile and run the HIP sample code (a modified version of [AMD's vcopy](https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/vcopy.cpp) with F32 operations) to verify the toolchain:
 
 ```bash
-python3 -m venv ./venv_rocprof_compute #Create venv
-source ./venv_rocprof_compute/bin/activate #activate venv
-pip3 install -r /lus/home/softs/rocm/6.4.3/libexec/rocprofiler-compute/requirements.txt
-```
-
-Later if you re-connect, just source the env.
-
-Now check that `rocprof-compute` command works:
-
-```bash
-(venv_rocprof_compute) [genden15] rbourgeois@g1015:/lus/work/RES1/genden15/rbourgeois/test_rocprof$ rocprof-compute
-usage: rocprof-compute [mode] [options]
-
-Command line interface for AMD's GPU profiler, ROCm Compute Profiler
-[...]
-```
-
-### Check that toolchain is okay
-Build and run the tutorial
-
-```c++
-mkdir build ; cd build
-cmake ..
+mkdir build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchains/adastra.mi250.7.2.0.cmake
 make -j
-./vcopy -n 1048576 -b 256 
+./vcopy -n 1048576 -b 256
 ```
 
-and put il all together 
+Expected output:
 
 ```
+vcopy testing on GCD 0
+Finished allocating vectors on the CPU
+Finished allocating vectors on the GPU
+Finished copying vectors to the GPU
+sw thinks it moved 1.000000 KB per wave
+Total threads: 1048576, Grid Size: 4096 block Size:256, Wavefronts:16384:
+Launching the kernel on the GPU
+Finished executing kernel
+Finished copying the output vector from the GPU to the CPU
+Releasing GPU memory
+Releasing CPU memory
+```
+
+### Set up `rocprof-compute`
+
+Check python version. It should not be `3.12`, `rocprof-compute` is not tested with `python>3.10` at the moment. By default on adastra it is `3.9` at the moment
+
+```bash
+python3 --version
+# should show Python 3.9.21
+```
+
+Launching `rocprof-compute` without setup will fail due to missing Python packages. Install them in a local virtual environment under `$WORK` to avoid exhausting your inode quota:
+
+```bash
+#In the root directory of rocprof_tests/
+python3 -m venv ./venv_rocprof_compute
+source ./venv_rocprof_compute/bin/activate
+pip3 install -r requirements.txt
+#fixed from /lus/home/softs/rocm/7.2.0/libexec/rocprofiler-compute/requirements.txt that breaks for some reasons
+```
+
+On future sessions, simply re-source the environment. Run `rocprof-compute` to verify no packages are missing.
+
+## Profiling
+
+### profile mode
+With everything in place, profile the application. The profiler replays the application ~13 times to collect all metrics, then benchmarks the GPU to measure it's actual peak performance (this can take a while). If `HIP_VISIBLE_DEVICES` is not set to `0`, all 8 GPUs will be benchmarked, so again make sure you do `export HIP_VISIBLE_DEVICES="0"`
+
+```bash
 rocprof-compute profile --name vcopy -- ./vcopy -n 1048576 -b 256
 ```
 
-#
+Results are saved under `workloads/`, including a PDF roofline plot. On subsequent runs, the GPU benchmark is skipped as long as the `workloads/` folder exists.
+
+### analyze mode
+
+You can then look at several section of the profile directly in the terminal, e.g.  the memory workload analysis:
+
+```bash
+rocprof-compute analyze -p workloads/vcopy/MI210/ -b 3
 ```
-cmake -DCMAKE_TOOLCHAIN_FILE=XXX ..
-```
+
+or the memory workload analysis
+
+```bash
+rocprof-compute analyze -p workloads/vcopy/MI210/ -b 4
+````
+
+go check the doc for more information [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html).
