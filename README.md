@@ -122,7 +122,10 @@ With everything in place, profile the application. The profiler replays the appl
 rocprof-compute profile --name vcopy -- ./vcopy -n 1048576 -b 256
 ```
 
-Results are saved under `workloads/`, including a PDF roofline plot. On subsequent runs, the GPU benchmark is skipped as long as the `workloads/` folder exists.
+Results are saved under `workloads/`, including a PDF roofline plot:
+![alt text](image-2.png) 
+
+On subsequent runs, the GPU benchmark is skipped as long as the `workloads/` folder exists.
 
 ### analyze mode
 
