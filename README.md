@@ -1,4 +1,4 @@
-# Rocprof Compute 101 on Adastra, March 2023
+# Rocprof Compute 101 with rocm/7.2.0 on Adastra, March 2023
 
 ## Context
 
@@ -13,8 +13,16 @@ It all seems very brittle at the moment, but we can expect a consolidation of th
 
 [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html)
 
-**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`. This tutorial is to get you prepared for the next generation of AMD profilers.
+**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`, which is stable. This tutorial is to get you prepared for the next generation of AMD profilers.
 
+Clone this tutorial repository and checkout the correct branch:
+
+```bash 
+cd $WORK
+git clone https://github.com/rbourgeois33/rocprof_tests.git
+cd rocprof_tests
+git checkout adastra-03-26
+```
 
 ## Setting up the Environment
 
@@ -30,16 +38,8 @@ Check your allocated node with `squeue --me`, then log into it (e.g. `ssh g1015`
 
 ```bash
 module purge
-cd $WORK
+cd $WORK/rocprof_tests
 export HIP_VISIBLE_DEVICES="0"
-```
-
-Clone the tutorial repository and check out the correct branch:
-
-```bash
-git clone git@github.com:rbourgeois33/rocprof_tests.git
-cd rocprof_tests
-git checkout adastra-03-26
 ```
 
 ### Create and load the rocm/7.2.0 module
@@ -82,31 +82,42 @@ Releasing CPU memory
 
 ### Set up `rocprof-compute`
 
-Check python version. It should not be `3.12`, `rocprof-compute` is not tested with `python>3.10` at the moment. By default on adastra it is `3.9` at the moment
+Load python
 
 ```bash
 python3 --version
-# should show Python 3.9.21
+# should be Python 3.12.1
 ```
 
-Launching `rocprof-compute` without setup will fail due to missing Python packages. Install them in a local virtual environment under `$WORK` to avoid exhausting your inode quota:
+Launching `rocprof-compute` without setup will fail due to missing python packages. Install them in a local virtual environment under `$WORK` to avoid exhausting your inode quota:
 
 ```bash
 #In the root directory of rocprof_tests/
 python3 -m venv ./venv_rocprof_compute
 source ./venv_rocprof_compute/bin/activate
 pip3 install -r requirements.txt
-#fixed from /lus/home/softs/rocm/7.2.0/libexec/rocprofiler-compute/requirements.txt that breaks for some reasons
+#fixed from /lus/home/softs/rocm/7.2.0/libexec/rocprofiler-compute/requirements.txt that breaks for here for some reasons... needs more investigation
 ```
 
-On future sessions, simply re-source the environment. Run `rocprof-compute` to verify no packages are missing.
+Run `rocprof-compute` to verify no packages are missing.
+
+On future sessions, simply re-source the environment:
+```bash
+module purge
+cd $WORK/rocprof_tests
+export HIP_VISIBLE_DEVICES="0"
+module use rocm/
+module load rocm-7.2.0
+source ./venv_rocprof_compute/bin/activate
+```
 
 ## Profiling
 
 ### profile mode
-With everything in place, profile the application. The profiler replays the application ~13 times to collect all metrics, then benchmarks the GPU to measure it's actual peak performance (this can take a while). If `HIP_VISIBLE_DEVICES` is not set to `0`, all 8 GPUs will be benchmarked, so again make sure you do `export HIP_VISIBLE_DEVICES="0"`
+With everything in place, profile the application. The profiler replays the application ~13 times to collect all metrics, then benchmarks the GPU to measure it's actual peak performance (this can take a while). If `HIP_VISIBLE_DEVICES` is not set to `0`, all 8 GPUs of the node will be benchmarked (or probably GPU0 will be profiled 8 times), so again make sure you do `export HIP_VISIBLE_DEVICES="0"`
 
 ```bash
+#In build/
 rocprof-compute profile --name vcopy -- ./vcopy -n 1048576 -b 256
 ```
 
@@ -114,16 +125,20 @@ Results are saved under `workloads/`, including a PDF roofline plot. On subseque
 
 ### analyze mode
 
-You can then look at several section of the profile directly in the terminal, e.g.  the memory workload analysis:
+You can then look at several section of the profile directly in the terminal, e.g. the memory workload analysis:
 
 ```bash
 rocprof-compute analyze -p workloads/vcopy/MI210/ -b 3
 ```
+![alt text](image.png)
+@georgios, is Wave Occupancy = 0 correct here ? it seems like a bug
 
-or the memory workload analysis
+or the roofline in terminal
 
 ```bash
 rocprof-compute analyze -p workloads/vcopy/MI210/ -b 4
-````
+```
+![alt text](image-1.png)
 
-go check the doc for more information [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html).
+
+I hope this worked. Please go check the doc for more informations and have a good hackathon ! [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html).
