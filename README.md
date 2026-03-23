@@ -1,19 +1,19 @@
-# Rocprof Compute 101 with rocm/7.2.0 on Adastra, March 2023
+# Rocprof Compute 101 with rocm/7.2.0 on Adastra, March 2026
 
 ## Context
 
-As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` is under active development, and releases earlier than `rocm/7.2.0` should not be used.
+As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` is under active development, and releases earlier than `rocm/7.2.0` may be unstable.
 
 This tutorial will help you to set up your environment:
 
 - Create a module for `rocm/7.2.0`, which is available on Adastra but not exposed as a module, and load it.
 - Set up a Python virtual environment with `rocprof-compute`'s dependencies.
 
-So that you can run the latest `rocprof-compute`.It all seems very brittle at the moment, but we can expect a consolidation of the tools in the future.
+So that you can run the latest `rocprof-compute`. It all seems very brittle at the moment, but we can expect a consolidation of the tools in the future.
 
 [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html)
 
-**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`, which is stable. This tutorial is to get you prepared for the next generation of AMD profilers.
+**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`, which is stable. This tutorial is to get you prepared for the next generation of AMD profilers, namely rocprof compute and systems.
 
 Clone this tutorial repository and checkout the correct branch:
 
@@ -129,7 +129,7 @@ On subsequent runs, the GPU benchmark is skipped as long as the `workloads/` fol
 
 ### analyze mode
 
-You can then look at several section of the profile directly in the terminal, e.g. the memory workload analysis:
+You can then look at several sections of the profile directly in the terminal, e.g. the memory workload analysis:
 
 ```bash
 rocprof-compute analyze -p workloads/vcopy/MI210/ -b 3
