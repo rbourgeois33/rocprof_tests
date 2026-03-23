@@ -2,7 +2,7 @@
 
 ## Context
 
-As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` is under active development, and releases earlier than `rocm/7.2.0` may be unstable.
+As of today, the official ROCm version to use on Adastra is 6.4.3 ([see the doc](https://dci.dci-gitlab.cines.fr/webextranet/other/changelogs.html#rocm-version-compatibility-with-cpe-25-09)), as later versions are not compatible with the Cray libraries. However, `rocprof-compute` and `rocprof-systems` are under active development, and releases earlier than `rocm/7.2.0` may be unstable.
 
 This tutorial will help you to set up your environment:
 
@@ -61,13 +61,13 @@ mkdir build
 cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchains/adastra.mi250.7.2.0.cmake
 make -j
-./vcopy -n 1048576 -b 256
+./hip_sample -n 1048576 -b 256
 ```
 
 Expected output:
 
 ```
-vcopy testing on GCD 0
+hip_sample testing on GCD 0
 Finished allocating vectors on the CPU
 Finished allocating vectors on the GPU
 Finished copying vectors to the GPU
@@ -119,7 +119,7 @@ With everything in place, profile the application. The profiler replays the appl
 
 ```bash
 #In build/
-rocprof-compute profile --name vcopy -- ./vcopy -n 1048576 -b 256
+rocprof-compute profile --name hip_sample -- ./hip_sample -n 1048576 -b 256
 ```
 
 Results are saved under `workloads/`, including a PDF roofline plot:
@@ -132,7 +132,7 @@ On subsequent runs, the GPU benchmark is skipped as long as the `workloads/` fol
 You can then look at several sections of the profile directly in the terminal, e.g. the memory workload analysis:
 
 ```bash
-rocprof-compute analyze -p workloads/vcopy/MI210/ -b 3
+rocprof-compute analyze -p workloads/hip_sample/MI210/ -b 3
 ```
 ![alt text](image.png)
 @georgios, is Wave Occupancy = 0 correct here ? it seems like a bug
@@ -140,7 +140,7 @@ rocprof-compute analyze -p workloads/vcopy/MI210/ -b 3
 or the roofline in terminal
 
 ```bash
-rocprof-compute analyze -p workloads/vcopy/MI210/ -b 4
+rocprof-compute analyze -p workloads/hip_sample/MI210/ -b 4
 ```
 ![alt text](image-1.png)
 

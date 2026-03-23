@@ -1,27 +1,5 @@
 /*
-##############################################################################bl
-# MIT License
-#
-# Copyright (c) 2021 - 2023 Advanced Micro Devices, Inc. All Rights Reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-##############################################################################el
+Adapted from https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/hip_sample.cpp
 */
 
 #include "hip/hip_runtime.h"
@@ -36,23 +14,25 @@ using namespace std;
 #define HIP_ASSERT(x) (assert((x)==hipSuccess))
 
 // HIP kernel. Each thread takes care of one element of c
-__global__ void vecCopy(double *a, double *b, double *c, int n, int stride) {
+__global__ void vecCopyWithMath(double *a, double *b, double *c, int n, int stride) {
     // Get our global thread ID
     int id = blockIdx.x*blockDim.x+threadIdx.x;
+    double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
     if (id < n)
-      c[id] = a[id]+sin(c[id])/(cos(c[id])+10);
+      c[id] = a[id]+zero;
 }
 
-// Duplicate of vecCopy kernel. Included for testing purposes
-__global__ void vecCopy_2(double *a, double *b, double *c, int n, int stride) {
+// Duplicate of vecCopyWithMath kernel. Included for testing purposes
+__global__ void vecCopyWithMath(double *a, double *b, double *c, int n, int stride) {
     // Get our global thread ID
     int id = blockIdx.x*blockDim.x+threadIdx.x;
+    double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
     if (id < n)
-      c[id] = a[id]+sin(c[id])/(cos(c[id])+10);
+      c[id] = a[id]+zero;
 }
 
 void usage() {
-  std::cout << "Usage: vcopy [OPTIONS]\n";
+  std::cout << "Usage: hip_sample [OPTIONS]\n";
   std::cout << "Required:\n";
   std::cout << "  -n/--numThreads <value>   Set the num of threads\n";
   std::cout << "  -b/--blockSize <value>    Set the block size\n";
@@ -126,7 +106,7 @@ int main(int argc, char* argv[]) {
     devId = 0;
   HIP_ASSERT(hipSetDevice(devId));
 
-  printf("vcopy testing on GCD %d\n", devId);
+  printf("hip_sample testing on GCD %d\n", devId);
 
   assert(n > 0);
   assert(blockSize > 0);
@@ -173,12 +153,12 @@ int main(int argc, char* argv[]) {
 
   // Execute the kernel
   for(int i = 0; i < numIter; i++){
-    hipLaunchKernelGGL(vecCopy, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
+    hipLaunchKernelGGL(vecCopyWithMath, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
     hip_status = hipDeviceSynchronize();
     printf("Finished executing kernel\n");
     // Optionally, launch a second kernel. Only here for testing purposes
     if (multiKernel){
-      hipLaunchKernelGGL(vecCopy_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
+      hipLaunchKernelGGL(vecCopyWithMath_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
       hip_status = hipDeviceSynchronize();
       printf("Finished executing kernel\n");
     }
