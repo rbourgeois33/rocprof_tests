@@ -13,7 +13,7 @@ So that you can run the latest `rocprof-compute`. It all seems very brittle at t
 
 [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html)
 
-**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`, which is stable. This tutorial is to get you prepared for the next generation of AMD profilers, namely rocprof compute and systems.
+**Note:** For working on your production code during the hackathon, you can use `rocprofv3` with `rocm/6.3.4`, which is stable. This tutorial is to get you prepared for the next generation of AMD profilers (`compute & systems`)
 
 Clone this tutorial repository and checkout the correct branch:
 
@@ -31,7 +31,7 @@ git checkout adastra-03-26
 This tutorial requires an interactive session on an Adastra MI250X node:
 
 ```bash
-salloc --account=<your-account> --constraint=MI250 --job-name="rocprof_tutorial" --gpus-per-node=1 --nodes=1 --time=1:00:00
+salloc --account=<your-account> --constraint=MI250 --job-name="rocprof_tutorial" --gpus-per-node=1 --cpus-per-task=12 --nodes=1 --time=1:00:00
 ```
 
 Check your allocated node with `squeue --me`, then log into it (e.g. `ssh g1015`). Purge your modules, go to `$WORK`, and restrict visible devices to GPU 0:
