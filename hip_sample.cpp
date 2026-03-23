@@ -174,12 +174,12 @@ int main(int argc, char* argv[]) {
     h_verify_c[i*stride] = h_a[i*stride] ;
   }
 
-  // // Verfiy results
-  // for(int i = 0; i < n; i++) {
-  //   if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5)
-  //     printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_c[i], d_c[i]);
-  // }
-  //printf("Printing few elements from the output vector\n");
+  // Verfiy results
+  for(int i = 0; i < n; i++) {
+    if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5)
+      printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_c[i], d_c[i]);
+  }
+  printf("Printing few elements from the output vector\n");
   for(int i = 0; i < 20; i++) {
     //printf("Output[%d]:%f\n",i, h_c[i]);
   }
