@@ -1,4 +1,4 @@
-# Rocprof Compute 101 with rocm/7.2.0 on Adastra, March 2026
+# Setting up rocprof-compute with rocm/7.2.0 on Adastra, March 2026
 
 ## Context
 
@@ -54,7 +54,7 @@ module avail rocm
 module load rocm-7.2.0
 ```
 
-Compile and run the HIP sample code (a modified version of [AMD's vcopy](https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/vcopy.cpp) with F32 operations) to verify the toolchain:
+Compile and run the HIP sample code (a modified version of [AMD's vcopy](https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/vcopy.cpp) with FP32 operations) to verify the toolchain:
 
 ```bash
 mkdir build
@@ -71,9 +71,10 @@ hip_sample testing on GCD 0
 Finished allocating vectors on the CPU
 Finished allocating vectors on the GPU
 Finished copying vectors to the GPU
-sw thinks it moved 1.000000 KB per wave
+Max grid size: 2147483647, Max block size: 1024
+sw thinks it moved 1.000000 KB per wave 
 Total threads: 1048576, Grid Size: 4096 block Size:256, Wavefronts:16384:
-Launching the kernel on the GPU
+Launching the  kernel on the GPU
 Finished executing kernel
 Finished copying the output vector from the GPU to the CPU
 Releasing GPU memory
@@ -120,6 +121,7 @@ With everything in place, profile the application. The profiler replays the appl
 ```bash
 #In build/
 rocprof-compute profile --name hip_sample -- ./hip_sample -n 1048576 -b 256
+#it stalls for a while but will finish eventually
 ```
 
 Results are saved under `workloads/`, including a PDF roofline plot:
@@ -145,4 +147,6 @@ rocprof-compute analyze -p workloads/hip_sample/MI210/ -b 4
 ![alt text](image-1.png)
 
 
-I hope this worked. Please go check the doc for more informations and have a good hackathon ! [Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html).
+I hope this worked. Please go check the doc for more informations and have a good hackathon ! 
+
+[Link: latest rocprof-compute documentation](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/how-to/use.html).

@@ -17,18 +17,18 @@ using namespace std;
 __global__ void vecCopyWithMath(double *a, double *b, double *c, int n, int stride) {
     // Get our global thread ID
     int id = blockIdx.x*blockDim.x+threadIdx.x;
+    if (id >= n) return;
     double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
-    if (id < n)
-      c[id] = a[id]+zero;
+    c[id] = a[id]+zero;
 }
 
 // Duplicate of vecCopyWithMath kernel. Included for testing purposes
 __global__ void vecCopyWithMath_2(double *a, double *b, double *c, int n, int stride) {
     // Get our global thread ID
     int id = blockIdx.x*blockDim.x+threadIdx.x;
+    if (id >= n) return;
     double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
-    if (id < n)
-      c[id] = a[id]+zero;
+    c[id] = a[id]+zero;
 }
 
 void usage() {
@@ -46,8 +46,8 @@ void usage() {
 
 int main(int argc, char* argv[]) {
   // Size of vectors
-  int n; //64 MB
-  int blockSize, gridSize;
+  int n{0}; //64 MB
+  int blockSize{0}, gridSize{0};
 
   // Launch multiple kernels
   bool multiKernel = false;
@@ -69,8 +69,6 @@ int main(int argc, char* argv[]) {
   int stride = 1;
   int devId = 0;
   int numIter = 1;
-
-  hipError_t hip_status;
 
   for (int i = 0; i < argc; i++){
     std::string arg = argv[i];
@@ -133,19 +131,27 @@ int main(int argc, char* argv[]) {
   for(int i = 0; i < n; i++) {
       h_a[i] = i;
       h_b[i] = i;
+      h_c[i] = 0;
   }
 
   // Copy host vectors to device
   HIP_ASSERT(hipMemcpy(d_a, h_a, bytes, hipMemcpyHostToDevice));
   HIP_ASSERT(hipMemcpy(d_b, h_b, bytes, hipMemcpyHostToDevice));
+  HIP_ASSERT(hipMemcpy(d_c, h_c, bytes, hipMemcpyHostToDevice));
 
   printf("Finished copying vectors to the GPU\n");
 
   // Number of thread blocks in grid
-  gridSize = (int)ceil((float)n/blockSize);
+  gridSize = (n+blockSize-1)/blockSize;
   int tot_waves = (blockSize*gridSize)/64;
   float num_bytes_kb = ((sizeof(double))*n)/(1024);
   float num_bytes_wave = (1.0*num_bytes_kb)/(1.0*tot_waves);
+
+// Check launch parameters are within device limits
+hipDeviceProp_t props;
+HIP_ASSERT(hipGetDeviceProperties(&props, devId));
+printf("Max grid size: %d, Max block size: %d\n", 
+       props.maxGridSize[0], props.maxThreadsPerBlock);
 
   printf("sw thinks it moved %f KB per wave \n", (2.0*num_bytes_wave));
   printf("Total threads: %d, Grid Size: %d block Size:%d, Wavefronts:%d:\n", n, gridSize, blockSize, tot_waves);
@@ -154,12 +160,12 @@ int main(int argc, char* argv[]) {
   // Execute the kernel
   for(int i = 0; i < numIter; i++){
     hipLaunchKernelGGL(vecCopyWithMath, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-    hip_status = hipDeviceSynchronize();
+    HIP_ASSERT(hipDeviceSynchronize());
     printf("Finished executing kernel\n");
     // Optionally, launch a second kernel. Only here for testing purposes
     if (multiKernel){
       hipLaunchKernelGGL(vecCopyWithMath_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-      hip_status = hipDeviceSynchronize();
+      HIP_ASSERT(hipDeviceSynchronize());
       printf("Finished executing kernel\n");
     }
   }
@@ -170,18 +176,15 @@ int main(int argc, char* argv[]) {
 
   // Compute for CPU
   for(int i=0; i<n; i++) {
-    // h_verify_c[i*stride] = h_a[i*stride] + h_b[i*stride];
     h_verify_c[i*stride] = h_a[i*stride] ;
   }
 
   // Verfiy results
   for(int i = 0; i < n; i++) {
-    if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5)
-      printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_c[i], d_c[i]);
-  }
-  printf("Printing few elements from the output vector\n");
-  for(int i = 0; i < 20; i++) {
-    //printf("Output[%d]:%f\n",i, h_c[i]);
+    if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5){
+      printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_verify_c[i], h_c[i]);
+   //   break;
+    }
   }
 
   printf("Releasing GPU memory\n");
@@ -196,6 +199,8 @@ int main(int argc, char* argv[]) {
   free(h_a);
   free(h_b);
   free(h_c);
+  free(h_verify_c); 
+
 
   return 0;
 }
