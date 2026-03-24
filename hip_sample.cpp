@@ -1,5 +1,5 @@
 /*
-Adapted from https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/hip_sample.cpp
+Adapted from https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/vcopy.cpp
 */
 
 #include "hip/hip_runtime.h"
