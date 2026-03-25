@@ -11,7 +11,17 @@ Adapted from https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sampl
 #include <iostream>
 using namespace std;
 
-#define HIP_ASSERT(x) (assert((x)==hipSuccess))
+#define HIP_CHECK(expression)                  \
+{                                              \
+    const hipError_t status = expression;      \
+    if(status != hipSuccess){                  \
+        std::cerr << "HIP error "              \
+                  << status << ": "            \
+                  << hipGetErrorString(status) \
+                  << " at " << __FILE__ << ":" \
+                  << __LINE__ << std::endl;    \
+    }                                          \
+}
 
 // HIP kernel. Each thread takes care of one element of c
 __global__ void vecCopyWithMath(double *a, double *b, double *c, int n, int stride) {
@@ -75,7 +85,7 @@ int main(int argc, char* argv[]) {
     if ((arg == "--blockSize" || arg == "-b") && i+1 < argc)
       blockSize = std::atoi(argv[i+1]);
 
-    else if ((arg == "--vec" || arg == "-n") && i+1 < argc)
+    else if ((arg == "--numThreads" || arg == "-n") && i+1 < argc)
       n = std::atoi(argv[i+1]);
 
     else if ((arg == "--device" || arg == "-d") && i+1 < argc)
@@ -98,11 +108,12 @@ int main(int argc, char* argv[]) {
     usage();
 
 
-  int numGpuDevices;
-  HIP_ASSERT(hipGetDeviceCount(&numGpuDevices));
+  int numGpuDevices = -1;
+  HIP_CHECK(hipGetDeviceCount(&numGpuDevices));
   if(devId >= numGpuDevices)
     devId = 0;
-  HIP_ASSERT(hipSetDevice(devId));
+  HIP_CHECK(hipSetDevice(devId));
+  printf("%d devices detected\n", numGpuDevices);
 
   printf("hip_sample testing on GCD %d\n", devId);
 
@@ -121,9 +132,9 @@ int main(int argc, char* argv[]) {
   printf("Finished allocating vectors on the CPU\n");
 
   // Allocate memory for each vector on GPU
-  HIP_ASSERT(hipMalloc(&d_a, bytes));
-  HIP_ASSERT(hipMalloc(&d_b, bytes));
-  HIP_ASSERT(hipMalloc(&d_c, bytes));
+  HIP_CHECK(hipMalloc(&d_a, bytes));
+  HIP_CHECK(hipMalloc(&d_b, bytes));
+  HIP_CHECK(hipMalloc(&d_c, bytes));
 
   printf("Finished allocating vectors on the GPU\n");
 
@@ -135,9 +146,9 @@ int main(int argc, char* argv[]) {
   }
 
   // Copy host vectors to device
-  HIP_ASSERT(hipMemcpy(d_a, h_a, bytes, hipMemcpyHostToDevice));
-  HIP_ASSERT(hipMemcpy(d_b, h_b, bytes, hipMemcpyHostToDevice));
-  HIP_ASSERT(hipMemcpy(d_c, h_c, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_a, h_a, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_b, h_b, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_c, h_c, bytes, hipMemcpyHostToDevice));
 
   printf("Finished copying vectors to the GPU\n");
 
@@ -149,7 +160,7 @@ int main(int argc, char* argv[]) {
 
 // Check launch parameters are within device limits
 hipDeviceProp_t props;
-HIP_ASSERT(hipGetDeviceProperties(&props, devId));
+HIP_CHECK(hipGetDeviceProperties(&props, devId));
 printf("Max grid size: %d, Max block size: %d\n", 
        props.maxGridSize[0], props.maxThreadsPerBlock);
 
@@ -160,18 +171,18 @@ printf("Max grid size: %d, Max block size: %d\n",
   // Execute the kernel
   for(int i = 0; i < numIter; i++){
     hipLaunchKernelGGL(vecCopyWithMath, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-    HIP_ASSERT(hipDeviceSynchronize());
+    HIP_CHECK(hipDeviceSynchronize());
     printf("Finished executing kernel\n");
     // Optionally, launch a second kernel. Only here for testing purposes
     if (multiKernel){
       hipLaunchKernelGGL(vecCopyWithMath_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-      HIP_ASSERT(hipDeviceSynchronize());
+      HIP_CHECK(hipDeviceSynchronize());
       printf("Finished executing kernel\n");
     }
   }
 
   // Copy array back to host
-  HIP_ASSERT(hipMemcpy( h_c, d_c, bytes, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy( h_c, d_c, bytes, hipMemcpyDeviceToHost));
   printf("Finished copying the output vector from the GPU to the CPU\n");
 
   // Compute for CPU
@@ -190,9 +201,9 @@ printf("Max grid size: %d, Max block size: %d\n",
   printf("Releasing GPU memory\n");
 
   // Release device memory
-  HIP_ASSERT(hipFree(d_a));
-  HIP_ASSERT(hipFree(d_b));
-  HIP_ASSERT(hipFree(d_c));
+  HIP_CHECK(hipFree(d_a));
+  HIP_CHECK(hipFree(d_b));
+  HIP_CHECK(hipFree(d_c));
 
   // Release host memory
   printf("Releasing CPU memory\n");
