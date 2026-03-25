@@ -59,7 +59,7 @@ Compile and run the HIP sample code (a modified version of [AMD's vcopy](https:/
 ```bash
 mkdir build
 cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchains/adastra.mi250.7.2.0.cmake
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../toolchains/adastra.mi250.7.2.0.cmake
 make -j
 ./hip_sample -n 1048576 -b 256
 ```
