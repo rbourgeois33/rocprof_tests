@@ -1,27 +1,5 @@
 /*
-##############################################################################bl
-# MIT License
-#
-# Copyright (c) 2021 - 2023 Advanced Micro Devices, Inc. All Rights Reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-##############################################################################el
+Adapted from https://github.com/ROCm/rocprofiler-compute/blob/amd-mainline/sample/vcopy.cpp
 */
 
 #include "hip/hip_runtime.h"
@@ -33,26 +11,38 @@
 #include <iostream>
 using namespace std;
 
-#define HIP_ASSERT(x) (assert((x)==hipSuccess))
-
-// HIP kernel. Each thread takes care of one element of c
-__global__ void vecCopy(double *a, double *b, double *c, int n, int stride) {
-    // Get our global thread ID
-    int id = blockIdx.x*blockDim.x+threadIdx.x;
-    if (id < n)
-      c[id] = a[id];
+#define HIP_CHECK(expression)                  \
+{                                              \
+    const hipError_t status = expression;      \
+    if(status != hipSuccess){                  \
+        std::cerr << "HIP error "              \
+                  << status << ": "            \
+                  << hipGetErrorString(status) \
+                  << " at " << __FILE__ << ":" \
+                  << __LINE__ << std::endl;    \
+    }                                          \
 }
 
-// Duplicate of vecCopy kernel. Included for testing purposes
-__global__ void vecCopy_2(double *a, double *b, double *c, int n, int stride) {
+// HIP kernel. Each thread takes care of one element of c
+__global__ void vecCopyWithMath(double *a, double *b, double *c, int n, int stride) {
     // Get our global thread ID
     int id = blockIdx.x*blockDim.x+threadIdx.x;
-    if (id < n)
-      c[id] = a[id];
+    if (id >= n) return;
+    double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
+    c[id] = a[id]+zero;
+}
+
+// Duplicate of vecCopyWithMath kernel. Included for testing purposes
+__global__ void vecCopyWithMath_2(double *a, double *b, double *c, int n, int stride) {
+    // Get our global thread ID
+    int id = blockIdx.x*blockDim.x+threadIdx.x;
+    if (id >= n) return;
+    double zero = sin(c[id])*sin(c[id]) + cos(c[id])*cos(c[id])-1.0; //Just to have math in profiler
+    c[id] = a[id]+zero;
 }
 
 void usage() {
-  std::cout << "Usage: vcopy [OPTIONS]\n";
+  std::cout << "Usage: hip_sample [OPTIONS]\n";
   std::cout << "Required:\n";
   std::cout << "  -n/--numThreads <value>   Set the num of threads\n";
   std::cout << "  -b/--blockSize <value>    Set the block size\n";
@@ -66,8 +56,8 @@ void usage() {
 
 int main(int argc, char* argv[]) {
   // Size of vectors
-  int n; //64 MB
-  int blockSize, gridSize;
+  int n{0}; //64 MB
+  int blockSize{0}, gridSize{0};
 
   // Launch multiple kernels
   bool multiKernel = false;
@@ -90,14 +80,12 @@ int main(int argc, char* argv[]) {
   int devId = 0;
   int numIter = 1;
 
-  hipError_t hip_status;
-
   for (int i = 0; i < argc; i++){
     std::string arg = argv[i];
     if ((arg == "--blockSize" || arg == "-b") && i+1 < argc)
       blockSize = std::atoi(argv[i+1]);
 
-    else if ((arg == "--vec" || arg == "-n") && i+1 < argc)
+    else if ((arg == "--numThreads" || arg == "-n") && i+1 < argc)
       n = std::atoi(argv[i+1]);
 
     else if ((arg == "--device" || arg == "-d") && i+1 < argc)
@@ -120,13 +108,14 @@ int main(int argc, char* argv[]) {
     usage();
 
 
-  int numGpuDevices;
-  HIP_ASSERT(hipGetDeviceCount(&numGpuDevices));
+  int numGpuDevices = -1;
+  HIP_CHECK(hipGetDeviceCount(&numGpuDevices));
   if(devId >= numGpuDevices)
     devId = 0;
-  HIP_ASSERT(hipSetDevice(devId));
+  HIP_CHECK(hipSetDevice(devId));
+  printf("%d devices detected\n", numGpuDevices);
 
-  printf("vcopy testing on GCD %d\n", devId);
+  printf("hip_sample testing on GCD %d\n", devId);
 
   assert(n > 0);
   assert(blockSize > 0);
@@ -143,9 +132,9 @@ int main(int argc, char* argv[]) {
   printf("Finished allocating vectors on the CPU\n");
 
   // Allocate memory for each vector on GPU
-  HIP_ASSERT(hipMalloc(&d_a, bytes));
-  HIP_ASSERT(hipMalloc(&d_b, bytes));
-  HIP_ASSERT(hipMalloc(&d_c, bytes));
+  HIP_CHECK(hipMalloc(&d_a, bytes));
+  HIP_CHECK(hipMalloc(&d_b, bytes));
+  HIP_CHECK(hipMalloc(&d_c, bytes));
 
   printf("Finished allocating vectors on the GPU\n");
 
@@ -153,19 +142,27 @@ int main(int argc, char* argv[]) {
   for(int i = 0; i < n; i++) {
       h_a[i] = i;
       h_b[i] = i;
+      h_c[i] = 0;
   }
 
   // Copy host vectors to device
-  HIP_ASSERT(hipMemcpy(d_a, h_a, bytes, hipMemcpyHostToDevice));
-  HIP_ASSERT(hipMemcpy(d_b, h_b, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_a, h_a, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_b, h_b, bytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(d_c, h_c, bytes, hipMemcpyHostToDevice));
 
   printf("Finished copying vectors to the GPU\n");
 
   // Number of thread blocks in grid
-  gridSize = (int)ceil((float)n/blockSize);
+  gridSize = (n+blockSize-1)/blockSize;
   int tot_waves = (blockSize*gridSize)/64;
   float num_bytes_kb = ((sizeof(double))*n)/(1024);
   float num_bytes_wave = (1.0*num_bytes_kb)/(1.0*tot_waves);
+
+// Check launch parameters are within device limits
+hipDeviceProp_t props;
+HIP_CHECK(hipGetDeviceProperties(&props, devId));
+printf("Max grid size: %d, Max block size: %d\n", 
+       props.maxGridSize[0], props.maxThreadsPerBlock);
 
   printf("sw thinks it moved %f KB per wave \n", (2.0*num_bytes_wave));
   printf("Total threads: %d, Grid Size: %d block Size:%d, Wavefronts:%d:\n", n, gridSize, blockSize, tot_waves);
@@ -173,49 +170,48 @@ int main(int argc, char* argv[]) {
 
   // Execute the kernel
   for(int i = 0; i < numIter; i++){
-    hipLaunchKernelGGL(vecCopy, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-    hip_status = hipDeviceSynchronize();
+    hipLaunchKernelGGL(vecCopyWithMath, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
+    HIP_CHECK(hipDeviceSynchronize());
     printf("Finished executing kernel\n");
     // Optionally, launch a second kernel. Only here for testing purposes
     if (multiKernel){
-      hipLaunchKernelGGL(vecCopy_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
-      hip_status = hipDeviceSynchronize();
+      hipLaunchKernelGGL(vecCopyWithMath_2, dim3(gridSize), dim3(blockSize), 0, 0, d_a, d_b, d_c, n, stride);
+      HIP_CHECK(hipDeviceSynchronize());
       printf("Finished executing kernel\n");
     }
   }
 
   // Copy array back to host
-  HIP_ASSERT(hipMemcpy( h_c, d_c, bytes, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy( h_c, d_c, bytes, hipMemcpyDeviceToHost));
   printf("Finished copying the output vector from the GPU to the CPU\n");
 
   // Compute for CPU
   for(int i=0; i<n; i++) {
-    // h_verify_c[i*stride] = h_a[i*stride] + h_b[i*stride];
     h_verify_c[i*stride] = h_a[i*stride] ;
   }
 
   // Verfiy results
   for(int i = 0; i < n; i++) {
-    if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5)
-      printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_c[i], d_c[i]);
-  }
-  //printf("Printing few elements from the output vector\n");
-  for(int i = 0; i < 20; i++) {
-    //printf("Output[%d]:%f\n",i, h_c[i]);
+    if (abs(h_verify_c[i*stride] - h_c[i*stride]) > 1e-5){
+      printf("Error at position i %d, Expected: %f, Found: %f \n", i, h_verify_c[i], h_c[i]);
+   //   break;
+    }
   }
 
   printf("Releasing GPU memory\n");
 
   // Release device memory
-  HIP_ASSERT(hipFree(d_a));
-  HIP_ASSERT(hipFree(d_b));
-  HIP_ASSERT(hipFree(d_c));
+  HIP_CHECK(hipFree(d_a));
+  HIP_CHECK(hipFree(d_b));
+  HIP_CHECK(hipFree(d_c));
 
   // Release host memory
   printf("Releasing CPU memory\n");
   free(h_a);
   free(h_b);
   free(h_c);
+  free(h_verify_c); 
+
 
   return 0;
 }
